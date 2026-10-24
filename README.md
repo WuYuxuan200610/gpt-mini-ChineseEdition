@@ -1,3 +1,4 @@
+
 # gpt-mini (Chinese Edition)
 
 A minimal GPT-2 style language model written from scratch.
@@ -28,31 +29,42 @@ gpt-mini/
 ├── requirements.txt # 依赖项
 ├── data/            # 存放训练数据 (不提交至 Git)
 └── checkpoints/     # 存放训练输出的模型权重 (不提交至 Git)
-🛠️ 环境准备 (Setup)
-bash
+```
+
+## 🛠️ 环境准备 (Setup)
+
+```bash
 # 安装依赖
 pip install -r requirements.txt
 
 # 预热分词器 (首次运行 tiktoken 会下载约 1MB 的 GPT-2 BPE 词表)
 python -c "import tiktoken; tiktoken.get_encoding('gpt2')"
-📚 中文数据集 (Data)
+```
+
+## 📚 中文数据集 (Data)
+
 本项目期待的数据格式为 JSONL（每行一个 JSON 对象，包含 text 字段）：
 
-json
+```json
 {"id": "1", "text": "今天天气很好，我们一起去公园散步。"}
+```
+
 这里使用的数据源：中文维基百科
 推荐使用 HuggingFace 上的 rfikd/wikipedia-zh-cn 数据集。
 
 由于完整数据集高达 2.1GB，而我们仅需要验证代码跑通，建议在本地截取前 1000 行，再上传到云服务器，节省传输时间：
 
-bash
+```bash
 # 截取前 1000 行 (仅几 MB)
 head -n 1000 wikipedia-zh-cn-20240901.json > data/wiki_1000.jsonl
-🚀 训练指南 (Train)
-第 1 步：冒烟测试 (Smoke Test)
+```
+
+## 🚀 训练指南 (Train)
+
+### 第 1 步：冒烟测试 (Smoke Test)
 在消耗大量算力前，可以先用极小的模型配置和数据跑通流程：
 
-bash
+```bash
 python train.py \
   --data_path data/wiki_1000.jsonl \
   --max_lines 100 \
@@ -61,10 +73,12 @@ python train.py \
   --n_layer 2 --n_head 2 --n_embd 128 \
   --epochs 1 \
   --out_dir checkpoints_smoke
+```
+
 如果终端成功打印 loss 并在 checkpoints_smoke/ 下生成了 .pt 文件，说明环境没问题。
 预期输出示例：
 
-text
+```text
 Device: cpu
 Chunks: total=21522, train=19370, val=2152
 Parameters: 6.84M
@@ -74,11 +88,12 @@ Parameters: 6.84M
 ...
 == epoch 0 | train=3.52 | val=3.48 | 340.5s
 Saved checkpoints_smoke/model_epoch_0.pt
+```
 
-第 2 步：正式训练 (Real Training)
+### 第 2 步：正式训练 (Real Training)
 使用完整的 1000 行数据进行训练（可根据显存调整 batch_size）：
 
-bash
+```bash
 python train.py \
   --data_path data/wiki_1000.jsonl \
   --max_lines 1000 \
@@ -88,23 +103,32 @@ python train.py \
   --epochs 2 \
   --lr 3e-4 \
   --out_dir checkpoints
+```
+
 训练完成后，checkpoints/ 目录下会生成每个 Epoch 的权重以及验证集 Loss 最低的 best.pt。
 
-💬 生成测试 (Generate)
+## 💬 生成测试 (Generate)
+
 使用训练好的模型进行中文文本续写：
 
-bash
+```bash
 python generate.py \
   --ckpt checkpoints/best.pt \
   --prompt "人工智能是" \
   --max_new_tokens 100
+```
 (提示：由于训练数据极少，模型生成的内容可能会重复或缺乏连贯逻辑，这属于正常现象。)
 
 ## 😅 模型局限性与有趣案例 (Limitations & Funny Cases)
+
 我用前文提及的数据集（HuggingFace 上的 rfikd/wikipedia-zh-cn 数据集）进行训练，
 从 10 万行中文维基百科语料中截取了**前 3 万行**进行训练（约 51 万个数据块，总计 14,365 个 Step）
 参数如下：
+
+```bash
 python train.py --data_path data/wiki_100k.jsonl --max_lines 30000 --block_size 256 --batch_size 32 --n_layer 6 --n_head 6 --n_embd 384 --epochs 1 --lr 3e-4 --weight_decay 0.1 --dropout 0.1 --out_dir checkpoints_100k
+```
+
 RTX4090运行30min左右
 因为终归是轻量实现，所以我试了一下对话，只能保证符合语法，但大多回答像在写散文诗或说胡话😄
 
@@ -120,18 +144,19 @@ RTX4090运行30min左右
     **输出**: `今天早上我吃了一个月的政治和人的制度，允许在我这些制度上发行。同时还指出，他`
 *   **输入**: `这只猫非常喜欢吃`  
     **输出**: `这只猫非常喜欢吃的角色。不过，一般经常采访前回多年的污染，该经过轻调`
+
 其实不难看出，模型虽然掌握了基础的中文语法和词频规律，但由于缺乏日常对话和常识语料，表现出了极强的**“维基百科领域偏置”**（满嘴都是城市、政治、地理）。
+
 > **工程反思**：
 > 如果想解决这种“胡说八道”，在工业界通常需要两步：
 > 1. **扩大模型参数量**（如 1B 以上）以容纳常识知识。
 > 2. **引入 SFT (指令微调)** 或对话语料，让模型从“续写维基百科”转变为“回答问题”。
 
-
-
 ## 📊 训练指标与可视化 (Training & Visualizations)
 
 本项目不仅从零手写了 GPT-2 架构，还集成了工业级的训练监控与深度模型剖析图表，全方位验证了模型的有效性。
 使用best_model_100k.pt里的参数
+
 ### 1. 训练核心指标 (Training Metrics)
 
 模型从 10 万行中文维基百科语料中截取了**前 3 万行**进行训练（约 51 万个数据块，总计 14,365 个 Step）。以下指标展示了模型极其健康且稳定的收敛过程：
@@ -182,15 +207,13 @@ RTX4090运行30min左右
 ---
 *(以上图表均由项目内的 `plot_*.py` 脚本全自动生成，保证实验结果 100% 可复现)*
 
+## ⚠️ 注意事项 (Caveats)
 
-⚠️ 注意事项 (Caveats)
-过拟合 (Overfitting)：1000 行中文数据产生的 Token 数远不足以喂饱 120M 参数量的模型。训练 Loss 会显著下降，但验证 Loss 可能会反弹。这主要是为了跑通教学流程。
+**过拟合 (Overfitting)**：1000 行中文数据产生的 Token 数远不足以喂饱 120M 参数量的模型。训练 Loss 会显著下降，但验证 Loss 可能会反弹。这主要是为了跑通教学流程。
 
-无 KV Cache：generate.py 每次推理都会重新计算完整上下文。适合短文本生成，长文本推理较慢。
+**无 KV Cache**：generate.py 每次推理都会重新计算完整上下文。适合短文本生成，长文本推理较慢。
 
-分词效率：项目使用 GPT-2 BPE 分词器，它对中文的切分粒度较细（一个汉字会被切为多个 Byte-level Token）。在真实中文大模型中，通常会使用针对中文优化的 SentencePiece 或扩充词表。
+**分词效率**：项目使用 GPT-2 BPE 分词器，它对中文的切分粒度较细（一个汉字会被切为多个 Byte-level Token）。在真实中文大模型中，通常会使用针对中文优化的 Sentence Piece 或扩充词表。
 
-
-📄 License
+## 📄 License
 MIT License
-
