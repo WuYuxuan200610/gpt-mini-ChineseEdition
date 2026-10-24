@@ -26,6 +26,10 @@ def main() -> None:
     parser.add_argument("--max_new_tokens", type=int, default=200)
     parser.add_argument("--device", type=str, default=None)
     parser.add_argument("--seed", type=int, default=1024)
+
+    parser.add_argument("--temperature", type=float, default=1.0, help="温度控制，越小越保守")
+    parser.add_argument("--top_k", type=int, default=None, help="Top-K 采样，只选概率前 K 的词")
+
     args = parser.parse_args()
 
     torch.manual_seed(args.seed)
@@ -45,7 +49,12 @@ def main() -> None:
     else:
         idx = torch.zeros((1, 1), dtype=torch.long, device=device)
 
-    out = model.generate(idx, max_new_tokens=args.max_new_tokens)
+    out = model.generate(
+        idx,
+        max_new_tokens=args.max_new_tokens,
+        temperature=args.temperature,
+        top_k=args.top_k
+    )
     print(enc.decode(out[0].tolist()))
 
 

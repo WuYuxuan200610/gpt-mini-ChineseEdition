@@ -139,16 +139,34 @@ class GPT(nn.Module):
         return logits, loss
 
     @torch.no_grad()
-    def generate(self, idx, max_new_tokens):
+    def generate(self, idx: torch.Tensor, max_new_tokens: int, temperature: float = 1.0,
+                 top_k: int = None) -> torch.Tensor:
+        """带温度和 Top-K 的生成策略。
+
+        Args:
+            temperature: 温度值，越小越保守，越大越随机。建议 0.7 - 1.0
+            top_k: 只保留概率最高的前 k 个词。建议 50
+        """
         for _ in range(max_new_tokens):
-            # 截断上下文
-            idx_cond = idx if idx.size(1) <= self.block_size else idx[:, -self.block_size:]
-
+            idx_cond = (
+                idx if idx.size(1) <= self.block_size
+                else idx[:, -self.block_size:]
+            )
             logits, _ = self(idx_cond)
-            logits = logits[:, -1, :]
-            probs = F.softmax(logits, dim=-1)
+            logits = logits[:, -1, :]  # (B, vocab)
 
-            # 采样
-            idx_next = torch.multinomial(probs, num_samples=1)
+            # 1. 应用温度控制 (Temperature)
+            if temperature != 1.0:
+                logits = logits / temperature
+
+            # 2. 应用 Top-K 采样
+            if top_k is not None:
+                # 获取前 k 个最大的 logits 值
+                v, _ = torch.topk(logits, min(top_k, logits.size(-1)))
+                # 把小于第 k 个值的 logits 设为负无穷，这样在 softmax 后概率就是 0
+                logits[logits < v[:, [-1]]] = -float('Inf')
+
+            probs = F.softmax(logits, dim=-1)
+            idx_next = torch.multinomial(probs, num_samples=1)  # (B, 1)
             idx = torch.cat((idx, idx_next), dim=1)
         return idx
