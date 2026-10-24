@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# IDE
+.idea/
+.vscode/
+.ipynb_checkpoints/
+
+# Data & checkpoints (never commit these)
+data/*
+!data/.gitkeep
+checkpoints/*
+!checkpoints/.gitkeep
+logs/
+
+# Weights
+*.pt
+*.pth
+*.bin
+
+# OS
+.DS_Store
